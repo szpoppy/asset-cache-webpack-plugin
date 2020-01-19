@@ -25,9 +25,9 @@ const AssetCachePlugin = require("asset-cache-webpack-plugin")
 conf.plugin("asset-cache").use(AssetCachePlugin, [
     {
         // 离线缓存排除文件
-        exclude: [/\.map$/, /\/_/],
+        exclude: [/\.map$/],
         // 注解部分
-        comment: env.subDir,
+        comment: "manifest",
         // 自定义 资源加载 可选参数
         assetLoader() {}
     }
@@ -37,12 +37,6 @@ conf.plugin("asset-cache").use(AssetCachePlugin, [
 ### 正常使用
 
 ```js
-new AssetCachePlugin({
-    // 离线缓存排除文件
-    exclude: [/\.map$/, /\/_/],
-    // 注解部分
-    comment: env.subDir,
-    // 自定义 资源加载 可选参数
-    assetLoader() {}
-})
+// 全部使用默认值
+new AssetCachePlugin()
 ```
