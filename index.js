@@ -53,14 +53,14 @@ function getRes(text) {
         tagCss,
         css,
         html: text
-            .replace(/<script[\s\S]+?src=(['"])(.+?)\1[\s\S]*?<\/script>/g, function(match, quot, src) {
+            .replace(/<script[^>]+?src=(['"])(.+?)\1[^>]*?>\s*?<\/script>/g, function(match, quot, src) {
                 // 正常的script正则
                 // cache.addAsset(src)
                 script.push(src)
                 tagScript.push(match)
                 return ""
             })
-            .replace(/<script[\s\S]+?src=([\S]+?)[\s>][\s\S]*?<\/script>/g, function(match, src) {
+            .replace(/<script[^>]+?src=([\S]+?)\s*[^>]*?>\s*?<\/script>/g, function(match, src) {
                 // console.log("match", match, src)
                 // 属性无引号的正则
                 // cache.addAsset(src)
@@ -68,7 +68,7 @@ function getRes(text) {
                 tagScript.push(match)
                 return ""
             })
-            .replace(/<link[\s\S]+?href=(['"]?)(.+?)\1[\s\S]*?\/?>/g, function(match, quot, src) {
+            .replace(/<link[^>]+?href=(['"]?)(.+?)\1[^>]*?\/?>/g, function(match, quot, src) {
                 // 正常css
                 if (/\.css$/.test(src)) {
                     // cache.addAsset(src)
@@ -78,7 +78,7 @@ function getRes(text) {
                 }
                 return match
             })
-            .replace(/<link[\s\S]+?href=([\S]+?)(?:>|\s+\/?>)/g, function(match, src) {
+            .replace(/<link[^>]+?href=([\S]+?)(?:>|\s+\/?>)/g, function(match, src) {
                 // 属性无css的
                 if (/\.css$/.test(src)) {
                     // cache.addAsset(src)
