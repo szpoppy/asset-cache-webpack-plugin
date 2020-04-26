@@ -60,7 +60,7 @@ function getRes(text) {
                 tagScript.push(match)
                 return ""
             })
-            .replace(/<script[^>]+?src=([\S]+?)\s*[^>]*?>\s*?<\/script>/g, function(match, src) {
+            .replace(/<script[^>]+?src=([\S]+?)(?:[\s*>]|\s+[^>]+>)\s*?<\/script>/g, function(match, src) {
                 // console.log("match", match, src)
                 // 属性无引号的正则
                 // cache.addAsset(src)
@@ -100,7 +100,10 @@ function assetDefLoader({ assets, asset, text, cache }) {
     cache.addAsset(tagCss)
 
     let assetJS = asset + ".js"
-    let assetScript = `window.document.write('${tagCss.join("").replace(/'/g, "\\'")}${tagScript.join("").replace(/'/g, "\\'")}')`
+    let assetScript = `window.document.write('${tagCss.join("").replace(/'/g, "\\'")}${tagScript
+        .join("")
+        .replace(/'/g, "\\'")
+        .replace(/<\//g, "</'+'")}')`
     // 加入时间差，办证加载器无缓存
     let scriptBody = `<script>window.document.write('<script src="${assetJS}?' + new Date().getTime() + '"></'+'script>')</script><script>if(!window.__asset_script_loaded_){${assetScript}}</script>`
 
