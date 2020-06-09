@@ -93,11 +93,11 @@ function getRes(text) {
 
 // 默认的资源加载重写器
 function assetDefLoader({ assets, asset, text, cache }) {
-    let { tagScript, tagCss, html } = getRes(text)
+    let { tagScript, tagCss, html, script, css } = getRes(text)
 
     // 分析出来的js和css加入缓存
-    cache.addAsset(tagScript)
-    cache.addAsset(tagCss)
+    cache.addAsset(script)
+    cache.addAsset(css)
 
     let assetJS = asset + ".js"
     let assetScript = `window.document.write('${tagCss.join("").replace(/'/g, "\\'")}${tagScript
