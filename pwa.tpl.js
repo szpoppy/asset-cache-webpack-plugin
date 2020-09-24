@@ -38,7 +38,6 @@ self.addEventListener("install", function(event) {
     // 获取数据并且加入cacheStorge
     var getAndPutErrNum = 0
     function getAndPut(cache) {
-        // console.log("-----------------install 2", version, cachePutArr.length, getAndPutErrNum)
         if (cachePutArr.length == 0 || getAndPutErrNum > 5) {
             return
         }
@@ -46,6 +45,7 @@ self.addEventListener("install", function(event) {
         // console.log("cachePutArr  -- ", url);
         caches.match(url).then(function(res) {
             if (res) {
+                cache.put(url, res.clone())
                 setTimeout(function() {
                     getAndPut(cache)
                 }, 0)

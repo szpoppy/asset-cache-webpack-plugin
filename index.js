@@ -8,23 +8,10 @@ let assetJSTpl = fs.readFileSync(path.resolve(__dirname, "asset.tpl.js"), "utf8"
 // pwa模版
 let assetPwaTpl = fs.readFileSync(path.resolve(__dirname, "pwa.tpl.js"), "utf8")
 
-class TplData {
-    constructor(val, type) {
-        this.val = val
-        this.type = type || "def"
-    }
-    toString() {
-        if (this.type == "tags") {
-            return `"${this.val.join("").replace(/"/g, '\\"').replace(/<\//g, '" + endTag + "')}"`
-        }
-        return this.val.toString()
-    }
-}
-
 function assetTplReplace(text, hash, min = true) {
-    let txt = text.replace(/"--(\w+)--"/g, function (s0, s1) {
+    let txt = text.replace(/"--(\w+)--"/g, function(s0, s1) {
         let val = hash[s1] || ""
-        if (val instanceof RegExp || val instanceof TplData) {
+        if (val instanceof RegExp) {
             return val.toString()
         }
         return JSON.stringify(val)
@@ -101,14 +88,14 @@ function getRes(text) {
         tagCss,
         css,
         html: text
-            .replace(/<script[^>]+?src=(['"])(.+?)\1[^>]*?>\s*?<\/script>/g, function (match, quot, src) {
+            .replace(/<script[^>]+?src=(['"])(.+?)\1[^>]*?>\s*?<\/script>/g, function(match, quot, src) {
                 // 正常的script正则
                 // cache.addAsset(src)
                 script.push(src)
                 tagScript.push(match)
                 return ""
             })
-            .replace(/<script[^>]+?src=([\S]+?)(?:[\s*>]|\s+[^>]+>)\s*?<\/script>/g, function (match, src) {
+            .replace(/<script[^>]+?src=([\S]+?)(?:[\s*>]|\s+[^>]+>)\s*?<\/script>/g, function(match, src) {
                 // console.log("match", match, src)
                 // 属性无引号的正则
                 // cache.addAsset(src)
@@ -116,7 +103,7 @@ function getRes(text) {
                 tagScript.push(match)
                 return ""
             })
-            .replace(/<link[^>]+?href=(['"]?)(.+?)\1[^>]*?\/?>/g, function (match, quot, src) {
+            .replace(/<link[^>]+?href=(['"]?)(.+?)\1[^>]*?\/?>/g, function(match, quot, src) {
                 // 正常css
                 if (/\.css$/.test(src)) {
                     // cache.addAsset(src)
@@ -126,7 +113,7 @@ function getRes(text) {
                 }
                 return match
             })
-            .replace(/<link[^>]+?href=([\S]+?)(?:>|\s+\/?>)/g, function (match, src) {
+            .replace(/<link[^>]+?href=([\S]+?)(?:>|\s+\/?>)/g, function(match, src) {
                 // 属性无css的
                 if (/\.css$/.test(src)) {
                     // cache.addAsset(src)
@@ -151,7 +138,6 @@ function assetDefLoader({ assets, asset, text, cache, version, pwaName }) {
     let assetTplText = assetTplReplace(assetJSTpl, {
         pwaName,
         version,
-        // new TplData(tagCss, "tags")
         tagCss: tagCss.join(""),
         tagScript: tagScript.join("")
     })
@@ -163,7 +149,7 @@ function assetDefLoader({ assets, asset, text, cache, version, pwaName }) {
     const bodyRegExp = /(<\/body\s*>)/i
     if (bodyRegExp.test(html)) {
         // Append assets to body element
-        html = html.replace(bodyRegExp, function (match) {
+        html = html.replace(bodyRegExp, function(match) {
             return scriptBody + match
         })
     } else {
