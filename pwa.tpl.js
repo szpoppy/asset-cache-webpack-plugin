@@ -3,31 +3,43 @@ var version = "--version--"
 // 需要离线缓存的数组
 var cacheArr = "--cacheArr--"
 // 自动离线的正则
-var autoCacheReg = "--pwaAutoCacheReg--"
+var autoCacheReg = "--swAutoCacheReg--"
 
 self.addEventListener("message", function(event) {
     // console.log("[message]", version, event.data);
     if (event.data && event.data.version) {
         version = event.data.version
+        // reSetCacheKeys()
     }
 })
 
 // 转全路径
-// var cacheArr = []
-// cachePutArr.forEach(function(url) {
-//     let loc = location
-//     let fUrl = ""
-//     if (/^\w+:/.test(url)) {
-//         fUrl = url
-//     } else if (/^\/\//.test(url)) {
-//         fUrl = loc.protocol + url
-//     } else if (/^\//.test(url)) {
-//         fUrl = loc.origin + url
-//     } else {
-//         fUrl = url.replace(/^(\.\/)*/, loc.origin + loc.pathname.replace(/[^/]*$/, ""))
-//     }
-//     cacheArr.push(fUrl)
-// })
+var cacheArrFull = {}
+cacheArr.forEach(function(url) {
+    var loc = location
+    var fUrl = ""
+    if (/^\w+:/.test(url)) {
+        fUrl = url
+    } else if (/^\/\//.test(url)) {
+        fUrl = loc.protocol + url
+    } else if (/^\//.test(url)) {
+        fUrl = loc.origin + url
+    } else {
+        fUrl = url.replace(/^(\.\/)*/, loc.origin + loc.pathname.replace(/[^/]*$/, ""))
+    }
+    cacheArrFull[fUrl] = true
+})
+
+// function appendCacheKeys() {
+//     caches.open(version).then(function(cache) {
+//         cache.keys().then(function(arr) {
+//             arr.forEach(function(req) {
+//                 cacheArrFull[req.url] = true
+//             })
+//             console.log("cacheKeys", cacheArrFull)
+//         })
+//     })
+// }
 
 // 跳过等待阶段
 self.skipWaiting()
@@ -101,31 +113,33 @@ self.addEventListener("fetch", function(event) {
         return
     }
 
-    // 走缓存
-    event.respondWith(
-        caches.match(req).then(function(cRes) {
-            // console.log("match", req, cRes)
-            if (cRes) {
-                return cRes
-            }
-            var reqCache = req.clone()
-            // console.log("++++++++++++++", req)
-            return fetch(reqCache).then(function(fRes) {
-                // console.log("+++++++++++++fRes+", fRes)
-                if (fRes && fRes.status == 200) {
-                    // console.log("++fetch++", autoCacheReg, autoCacheReg.test, autoCacheReg.test(req.url), req.url)
-                    if (autoCacheReg && autoCacheReg.test && autoCacheReg.test(req.url)) {
+    if (cacheArrFull[req.url] || (autoCacheReg instanceof RegExp && autoCacheReg.test(req.url))) {
+        // 走缓存
+        event.respondWith(
+            caches.match(req).then(function(cRes) {
+                // console.log("match", req, cRes)
+                if (cRes) {
+                    return cRes
+                }
+                // var reqCache = req.clone()
+                // reqCache.mode = "cors"
+                // console.log("++++++++++++++", req)
+                return fetch(req.url, { mode: "cors" }).then(function(fRes) {
+                    // console.log("+++++++++++++fRes+xxxxx", fRes, req.url)
+                    if (fRes && fRes.status == 200) {
+                        // console.log("++fetch++", autoCacheReg, autoCacheReg.test, autoCacheReg.test(req.url), req.url)
                         var xRes = fRes.clone()
                         // 满足自动加入缓存
                         // 匹配完成
                         caches.open(version).then(function(cache) {
-                            // console.log("++cache++", xRes)
+                            // console.log("++cache++", xRes, version, cache)
                             cache.put(xRes.url, xRes)
+                            cacheArrFull[xRes.url] = true
                         })
                     }
-                }
-                return fRes
+                    return fRes
+                })
             })
-        })
-    )
+        )
+    }
 })

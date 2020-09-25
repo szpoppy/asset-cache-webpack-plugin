@@ -17,9 +17,14 @@ function assetTplReplace(text, hash, min = true) {
         return JSON.stringify(val)
     })
     if (min) {
-        return UglifyJS.minify(txt).code || txt
+        let uJS = UglifyJS.minify(txt)
+        // if (!uJS.code) {
+        //     console.error(uJS)
+        // }
+        return uJS.code || txt
     }
-    return text
+    // console.log(txt)
+    return txt
 }
 
 function assetsSource(text) {
@@ -127,23 +132,53 @@ function getRes(text) {
 }
 
 // 默认的资源加载重写器
-function assetDefLoader({ assets, asset, text, cache, version, pwaName }) {
+function assetDefLoader({ assets, asset, text, cache, version, swUrl, swType }) {
     let { tagScript, tagCss, html, script, css } = getRes(text)
+
+    const serviceWorkText = `
+var canUse = ${swType} || !window.applicationCache
+var sw = window.navigator.serviceWorker
+if (sw && canUse) {
+    if (sw.controller) {
+        sw.controller.postMessage({
+            version: "${version}"
+        })
+    }
+
+    // 使用浏览器特定方法注册一个新的service worker
+    sw.register("${swUrl}").then(function(reg) {
+        if (!reg.active) {
+            reg.update()
+        }
+    })
+}`
 
     // 分析出来的js和css加入缓存
     cache.addAsset(script)
     cache.addAsset(css)
 
     let assetJS = asset + ".js"
-    let assetTplText = assetTplReplace(assetJSTpl, {
-        pwaName,
-        version,
-        tagCss: tagCss.join(""),
-        tagScript: tagScript.join("")
-    })
+    // 基本的，容灾使用
+    let assetTplText = assetTplReplace(
+        assetJSTpl,
+        {
+            tagCss: tagCss.join(""),
+            tagScript: tagScript.join("")
+        },
+        false
+    )
+    let assetTplTextJs = assetTplText
+    if (swType >= 0) {
+        // 加入 service
+        assetTplTextJs = assetTplText.replace("//#servicework#//", serviceWorkText)
+    }
+    assetTplTextJs = UglifyJS.minify(assetTplTextJs).code || assetTplTextJs
+
+    assetTplText = UglifyJS.minify(assetTplText).code || assetTplText
+    assets[assetJS] = assetsSource(assetTplTextJs)
+
     // 加入时间差，办证加载器无缓存
     let scriptBody = `<script>window.document.write('<script src="${assetJS}?' + new Date().getTime() + '"></'+'script>')</script><script>${assetTplText}</script>`
-    assets[assetJS] = assetsSource(assetTplText)
 
     // 加入 代码
     const bodyRegExp = /(<\/body\s*>)/i
@@ -161,9 +196,11 @@ function assetDefLoader({ assets, asset, text, cache, version, pwaName }) {
 }
 
 // html代码增加 manifest
-function assetMakeHTML(assets, asset, name, assetLoader, cache, compilation, version, pwaName) {
+function assetMakeHTML(assets, asset, assetName, compilation, swName) {
+    // , this.assetLoader || assetDefLoader, this.cache
     // manifest
-    let manifest = asset.replace(/[^/]+\/+/g, "../").replace(/[^/]+$/, name)
+    let manifest = asset.replace(/[^/]+\/+/g, "../").replace(/[^/]+$/, assetName)
+    let swUrl = asset.replace(/[^/]+\/+/g, "../").replace(/[^/]+$/, swName)
     let text = assets[asset].source().replace(/(<html[^>]*)(>)/i, (match, start, end) => {
         // Append the manifest only if no manifest was specified
         if (/\smanifest\s*=/.test(match)) {
@@ -172,19 +209,17 @@ function assetMakeHTML(assets, asset, name, assetLoader, cache, compilation, ver
         return start + ' manifest="' + manifest + '"' + end
     })
 
-    text = assetLoader({
-        assets,
-        asset,
-        text,
-        cache,
-        getRes,
-        compilation,
-        assetDefLoader() {
-            return assetDefLoader({ assets, asset, text, cache, version, pwaName })
-        },
-        version,
-        pwaName
-    })
+    let assetLoader = this.assetLoader || assetDefLoader
+    let param = { assets, asset, text, cache: this.cache, version: this.version, swUrl, swType: this.swType }
+    text = assetLoader(
+        Object.assign({}, param, {
+            getRes,
+            compilation,
+            assetDefLoader() {
+                return assetDefLoader(param)
+            }
+        })
+    )
 
     // 重写 html asset
     assets[asset] = assetsSource(text)
@@ -192,16 +227,20 @@ function assetMakeHTML(assets, asset, name, assetLoader, cache, compilation, ver
 
 // webpack 插件入口
 class AssetCachePlugin {
-    constructor({ exclude = [], name = "asset", comment, assetLoader, version, pwaAutoCacheReg } = {}) {
-        if (pwaAutoCacheReg && pwaAutoCacheReg instanceof RegExp) {
-            this.pwaAutoCacheReg = pwaAutoCacheReg
+    constructor({ exclude = [], name = "asset", comment, assetLoader, version, swAutoCacheReg, assetEach, swType = 0 } = {}) {
+        if (swAutoCacheReg && swAutoCacheReg instanceof RegExp) {
+            this.swAutoCacheReg = swAutoCacheReg
         }
+        // serviceWork 工作状态 -1 不使用 0 自动 1 使用
+        this.swType = typeof swType == "number" ? swType : 0
         this.version = version || "pwa" + new Date().getTime().toString(36)
         // manifest 名称
         this.name = name
         this.cache = new AssetCache({ comment })
         // 自定义资源加载器 方便做容灾
         this.assetLoader = assetLoader
+
+        this.assetEach = assetEach
 
         // Convert exclusion strings to RegExp.
         this.exclude = exclude.map(exclusion => {
@@ -215,35 +254,44 @@ class AssetCachePlugin {
         const { publicPath = "" } = outputOptions
 
         const buildAppCache = compilation => {
-            let version = this.version
-            let assets = compilation.assets
-
+            const version = this.version
+            const assets = compilation.assets
+            const cache = this.cache
+            const swAutoCacheReg = this.swAutoCacheReg
+            const swType = this.swType
             const assetName = this.name + ".appcache"
-            const pwaName = this.name + ".pwa.js"
-            for (let asset in compilation.assets) {
-                if (/\.html$/.test(asset)) {
+            const swName = this.name + ".sw.js"
+            let assetEach = this.assetEach || function() {}
+            for (let key in assets) {
+                assetEach({
+                    key,
+                    assets,
+                    cache,
+                    swAutoCacheReg
+                })
+                if (/\.html$/.test(key)) {
                     // 处理html
-                    assetMakeHTML(assets, asset, assetName, this.assetLoader || assetDefLoader, this.cache, compilation, version, pwaName)
+                    assetMakeHTML.call(this, assets, key, assetName, compilation, swName)
                     continue
                 }
 
-                if (/\.appcache$/.test(asset)) {
+                if (/\.appcache$/.test(key)) {
                     // 不用离线
                     continue
                 }
 
                 // 排除不需要缓存的url
-                if (!this.exclude.some(pattern => pattern.test(asset))) {
-                    this.cache.addAsset(publicPath + asset)
+                if (!this.exclude.some(pattern => pattern.test(key))) {
+                    cache.addAsset(publicPath + key)
                 }
             }
 
             if (!assets[assetName]) {
-                assets[assetName] = this.cache
+                assets[assetName] = cache
             }
 
-            if (!assets[pwaName]) {
-                assets[pwaName] = assetsSource(assetTplReplace(assetPwaTpl, { version, cacheArr: this.cache.assets, pwaAutoCacheReg: this.pwaAutoCacheReg }))
+            if (!assets[swName] && swType >= 0) {
+                assets[swName] = assetsSource(assetTplReplace(assetPwaTpl, { version, cacheArr: cache.assets, swAutoCacheReg }))
             }
         }
 

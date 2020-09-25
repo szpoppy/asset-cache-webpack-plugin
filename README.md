@@ -32,11 +32,39 @@ conf.plugin("asset-cache").use(AssetCachePlugin, [
         comment: "manifest",
         // 自定义 资源加载 可选参数
         assetLoader() {},
+        // 循环assets时调用， 下面的例子是通过正则将页面中的外链资源地址找出并加入离线缓存清单文件中
+        assetEach({ key, assets, cache }) {
+            if (!/(?!\.html)\.(js|css)$/.test(key)) {
+                // 匹配 css 和 js 排除 .html.js
+                return
+            }
+
+            let source = assets[key].source()
+            if (typeof source != "string") {
+                return
+            }
+
+            source = source.match(/(?:(["'])|\()(?:(?:https?|ftp):)?[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|](?:\1|\))/g)
+            if (!source) {
+                return
+            }
+            source.forEach(function(url) {
+                url = url.slice(1, url.length - 1)
+                let sort = url.split(/[?#]/)[0]
+                if (/\.(?:png|jpe?g|gif|svg|js|css|woff2?|eot|ttf|otf)$/.test(sort)) {
+                    // 加入缓存列表，而且必须为这些结尾的外链资源
+                    cache.addAsset(url)
+                    return
+                }
+            })
+        },
         // pwa cache 需要的版本号，不传会自动生成
         version: "v111",
         // 非清单文件中的文件，如果匹配，会自动离线
         // 不传，将不离线清单外的资源
-        pwaAutoCacheReg: /\/\/file.40017.cn\//
+        swAutoCacheReg: /\/\/file.democdn.cn\//,
+        // serviceWork 开启状态 -1 关闭  0 自动（appCache没有的时候开启） 1 始终开启 注意：如果浏览器本身不支持，也无效
+        swType: 1
     }
 ])
 ```
