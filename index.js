@@ -45,16 +45,16 @@ class AssetCache {
         this.comment = comment
     }
 
-    addAsset(asset) {
+    addAsset(asset, isPre = false) {
         if (asset.constructor == Array) {
             for (let i = 0; i < asset.length; i += 1) {
-                this.addAsset(asset[i])
+                this.addAsset(asset[i], isPre)
             }
             return
         }
         let src = encodeURI(asset)
         if (this.assets.indexOf(src) < 0) {
-            this.assets.push(src)
+            this.assets[ isPre ? "unshift" : "push" ](src)
         }
     }
 
@@ -211,7 +211,8 @@ function assetMakeHTML(assets, asset, assetName, compilation, swName) {
 
     let assetLoader = this.assetLoader || assetDefLoader
     let param = { assets, asset, text, cache: this.cache, version: this.version, swUrl, swType: this.swType }
-    text = assetLoader(
+    text = assetLoader.call(
+        this,
         Object.assign({}, param, {
             getRes,
             compilation,
@@ -227,7 +228,7 @@ function assetMakeHTML(assets, asset, assetName, compilation, swName) {
 
 // webpack 插件入口
 class AssetCachePlugin {
-    constructor({ exclude = [], name = "asset", comment, assetLoader, version, swAutoCacheReg, assetEach, swType = 0 } = {}) {
+    constructor({ exclude = [], name = "asset", comment, assetLoader, version, swAutoCacheReg, assetEach, swType = 0, assetLoaderEnd } = {}) {
         if (swAutoCacheReg && swAutoCacheReg instanceof RegExp) {
             this.swAutoCacheReg = swAutoCacheReg
         }
@@ -247,6 +248,8 @@ class AssetCachePlugin {
             if (exclusion instanceof RegExp) return exclusion
             return new RegExp(`^${exclusion}$`)
         })
+
+        this.assetLoaderEnd = assetLoaderEnd
     }
 
     apply(compiler) {
@@ -263,7 +266,7 @@ class AssetCachePlugin {
             const swName = this.name + ".sw.js"
             let assetEach = this.assetEach || function() {}
             for (let key in assets) {
-                assetEach({
+                assetEach.call(this, {
                     key,
                     assets,
                     cache,
@@ -285,6 +288,16 @@ class AssetCachePlugin {
                     cache.addAsset(publicPath + key)
                 }
             }
+
+            this.assetLoaderEnd && this.assetLoaderEnd({
+                compilation,
+                setAsset(name, text) {
+                  assets[swName] = assetsSource(text)
+                },
+                getSWAsset(param = {}) {
+                  return assetsSource(assetTplReplace(assetPwaTpl, Object.assign({ version, cacheArr: cache.assets, swAutoCacheReg }, param)))
+                }
+            })
 
             if (!assets[assetName]) {
                 assets[assetName] = cache
