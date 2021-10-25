@@ -9,7 +9,7 @@ let assetJSTpl = fs.readFileSync(path.resolve(__dirname, "asset.tpl.js"), "utf8"
 let assetPwaTpl = fs.readFileSync(path.resolve(__dirname, "pwa.tpl.js"), "utf8")
 
 function assetTplReplace(text, hash, min = true) {
-    let txt = text.replace(/"--(\w+)--"/g, function(s0, s1) {
+    let txt = text.replace(/"--(\w+)--"/g, function (s0, s1) {
         let val = hash[s1] || ""
         if (val instanceof RegExp) {
             return val.toString()
@@ -54,7 +54,7 @@ class AssetCache {
         }
         let src = encodeURI(asset)
         if (this.assets.indexOf(src) < 0) {
-            this.assets[ isPre ? "unshift" : "push" ](src)
+            this.assets[isPre ? "unshift" : "push"](src)
         }
     }
 
@@ -93,14 +93,14 @@ function getRes(text) {
         tagCss,
         css,
         html: text
-            .replace(/<script[^>]+?src=(['"])(.+?)\1[^>]*?>\s*?<\/script>/g, function(match, quot, src) {
+            .replace(/<script[^>]+?src=(['"])(.+?)\1[^>]*?>\s*?<\/script>/g, function (match, quot, src) {
                 // 正常的script正则
                 // cache.addAsset(src)
                 script.push(src)
                 tagScript.push(match)
                 return ""
             })
-            .replace(/<script[^>]+?src=([\S]+?)(?:[\s*>]|\s+[^>]+>)\s*?<\/script>/g, function(match, src) {
+            .replace(/<script[^>]+?src=([\S]+?)(?:[\s*>]|\s+[^>]+>)\s*?<\/script>/g, function (match, src) {
                 // console.log("match", match, src)
                 // 属性无引号的正则
                 // cache.addAsset(src)
@@ -108,7 +108,7 @@ function getRes(text) {
                 tagScript.push(match)
                 return ""
             })
-            .replace(/<link[^>]+?href=(['"]?)(.+?)\1[^>]*?\/?>/g, function(match, quot, src) {
+            .replace(/<link[^>]+?href=(['"]?)(.+?)\1[^>]*?\/?>/g, function (match, quot, src) {
                 // 正常css
                 if (/\.css$/.test(src)) {
                     // cache.addAsset(src)
@@ -118,7 +118,7 @@ function getRes(text) {
                 }
                 return match
             })
-            .replace(/<link[^>]+?href=([\S]+?)(?:>|\s+\/?>)/g, function(match, src) {
+            .replace(/<link[^>]+?href=([\S]+?)(?:>|\s+\/?>)/g, function (match, src) {
                 // 属性无css的
                 if (/\.css$/.test(src)) {
                     // cache.addAsset(src)
@@ -184,7 +184,7 @@ if (sw && canUse) {
     const bodyRegExp = /(<\/body\s*>)/i
     if (bodyRegExp.test(html)) {
         // Append assets to body element
-        html = html.replace(bodyRegExp, function(match) {
+        html = html.replace(bodyRegExp, function (match) {
             return scriptBody + match
         })
     } else {
@@ -197,6 +197,7 @@ if (sw && canUse) {
 
 // html代码增加 manifest
 function assetMakeHTML(assets, asset, assetName, compilation, swName) {
+    console.log("zzzz", assets, asset, assetName, swName)
     // , this.assetLoader || assetDefLoader, this.cache
     // manifest
     let manifest = asset.replace(/[^/]+\/+/g, "../").replace(/[^/]+$/, assetName)
@@ -264,8 +265,12 @@ class AssetCachePlugin {
             const swType = this.swType
             const assetName = this.name + ".appcache"
             const swName = this.name + ".sw.js"
-            let assetEach = this.assetEach || function() {}
+            let assetEach = this.assetEach || function () {}
             for (let key in assets) {
+                let isExclude = this.exclude.some(pattern => pattern.test(key))
+                if (isExclude) {
+                    continue
+                }
                 assetEach.call(this, {
                     key,
                     assets,
@@ -284,20 +289,19 @@ class AssetCachePlugin {
                 }
 
                 // 排除不需要缓存的url
-                if (!this.exclude.some(pattern => pattern.test(key))) {
-                    cache.addAsset(publicPath + key)
-                }
+                cache.addAsset(publicPath + key)
             }
 
-            this.assetLoaderEnd && this.assetLoaderEnd({
-                compilation,
-                setAsset(name, text) {
-                  assets[swName] = assetsSource(text)
-                },
-                getSWAsset(param = {}) {
-                  return assetsSource(assetTplReplace(assetPwaTpl, Object.assign({ version, cacheArr: cache.assets, swAutoCacheReg }, param)))
-                }
-            })
+            this.assetLoaderEnd &&
+                this.assetLoaderEnd({
+                    compilation,
+                    setAsset(name, text) {
+                        assets[swName] = assetsSource(text)
+                    },
+                    getSWAsset(param = {}) {
+                        return assetsSource(assetTplReplace(assetPwaTpl, Object.assign({ version, cacheArr: cache.assets, swAutoCacheReg }, param)))
+                    }
+                })
 
             if (!assets[assetName]) {
                 assets[assetName] = cache
