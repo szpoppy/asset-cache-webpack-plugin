@@ -197,7 +197,6 @@ if (sw && canUse) {
 
 // html代码增加 manifest
 function assetMakeHTML(assets, asset, assetName, compilation, swName) {
-    console.log("zzzz", assets, asset, assetName, swName)
     // , this.assetLoader || assetDefLoader, this.cache
     // manifest
     let manifest = asset.replace(/[^/]+\/+/g, "../").replace(/[^/]+$/, assetName)
