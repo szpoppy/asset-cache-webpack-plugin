@@ -15,31 +15,6 @@ self.addEventListener("message", function(event) {
 
 // 转全路径
 var cacheArrFull = {}
-cacheArr.forEach(function(url) {
-    var loc = location
-    var fUrl = ""
-    if (/^\w+:/.test(url)) {
-        fUrl = url
-    } else if (/^\/\//.test(url)) {
-        fUrl = loc.protocol + url
-    } else if (/^\//.test(url)) {
-        fUrl = loc.origin + url
-    } else {
-        fUrl = url.replace(/^(\.\/)*/, loc.origin + loc.pathname.replace(/[^/]*$/, ""))
-    }
-    cacheArrFull[fUrl] = true
-})
-
-// function appendCacheKeys() {
-//     caches.open(version).then(function(cache) {
-//         cache.keys().then(function(arr) {
-//             arr.forEach(function(req) {
-//                 cacheArrFull[req.url] = true
-//             })
-//             console.log("cacheKeys", cacheArrFull)
-//         })
-//     })
-// }
 
 // 跳过等待阶段
 self.skipWaiting()
@@ -47,10 +22,8 @@ self.skipWaiting()
 // 缓存
 self.addEventListener("install", function(event) {
     var cachePutArr = cacheArr.slice(0)
-    // 获取数据并且加入cacheStorge
-    var getAndPutErrNum = 0
     function getAndPut(cache) {
-        if (cachePutArr.length == 0 || getAndPutErrNum > 5) {
+        if (cachePutArr.length == 0) {
             return
         }
         var url = cachePutArr.shift()
@@ -68,11 +41,11 @@ self.addEventListener("install", function(event) {
                     .then(function(fRes) {
                         if (fRes && fRes.status == 200) {
                             cache.put(fRes.url, fRes)
+                            cacheArrFull[fRes.url] = true
                         }
                         getAndPut(cache)
                     })
                     .catch(function() {
-                        getAndPutErrNum += 1
                         getAndPut(cache)
                     })
             }
