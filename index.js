@@ -201,7 +201,11 @@ function assetMakeHTML(assets, asset, assetName, compilation, swName) {
     // manifest
     let manifest = asset.replace(/[^/]+\/+/g, "../").replace(/[^/]+$/, assetName)
     let swUrl = asset.replace(/[^/]+\/+/g, "../").replace(/[^/]+$/, swName)
-    let text = assets[asset].source().replace(/(<html[^>]*)(>)/i, (match, start, end) => {
+    let text = assets[asset].source()
+    if(text.toString) {
+        text = text.toString()
+    }
+    text = text.replace(/(<html[^>]*)(>)/i, (match, start, end) => {
         // Append the manifest only if no manifest was specified
         if (/\smanifest\s*=/.test(match)) {
             return match
